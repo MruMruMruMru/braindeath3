@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mordum Brain-Death Mini Game</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090b10;color:#eee;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#mordumGame5{width:min(980px,96vw);margin:20px auto;background:#11151d;border:1px solid #2c3442;border-radius:18px;padding:16px;box-shadow:0 16px 50px #0008}
+#mordumGame5 .top{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+#mordumGame5 h2{margin:0;font-size:22px}
+#mordumGame5 .hud{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+#mordumGame5 .badge{padding:7px 11px;border:1px solid #343d4c;border-radius:10px;background:#171c25;font-weight:800}
+#mordumGame5 .timer{font-variant-numeric:tabular-nums;font-size:22px;min-width:74px;text-align:center}
+#mordumGame5 .arenaWrap{position:relative;margin-top:12px;background:#080a0f;border-radius:15px;overflow:hidden;border:1px solid #29303c;perspective:1100px}
+#mordumGame5 #arenaCanvas{display:block;width:100%;height:auto;aspect-ratio:5/3;user-select:none;cursor:crosshair;background:#07090e}
+#mordumGame5 .arenaWrap{perspective:1100px}
+#mordumGame5 .zone{stroke:#0b0d12;stroke-width:3}
+#mordumGame5 .zoneLabel{font-size:16px;font-weight:950;fill:#fff;text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:#07080b;stroke-width:5px}
+#mordumGame5 .boss{fill:#161a22;stroke:#9aa4b8;stroke-width:3}
+#mordumGame5 .bossText{fill:#fff;text-anchor:middle;font-weight:1000;font-size:18px}
+#mordumGame5 .p{stroke:#090b10;stroke-width:3}
+#mordumGame5 .p.me{stroke:#111;stroke-width:3;filter:none}
+#mordumGame5 .youLabel,#mordumGame5 .npcLabel,#mordumGame5 .numLabel{
+  text-anchor:middle;pointer-events:none;paint-order:stroke;stroke:#08090c;stroke-width:6px;stroke-linejoin:round;font-weight:1000
+}
+#mordumGame5 .youLabel{fill:#fff;font-size:20px}
+#mordumGame5 .npcLabel{fill:#fff;font-size:12px}
+#mordumGame5 .numLabel{fill:#ffe477;font-size:13px}
+#mordumGame5 .pingDot{
+  fill:#43ff73;
+  stroke:#07150b;
+  stroke-width:1.5px;
+}
+#mordumGame5 .targetAura{
+  fill:rgba(255,255,255,.13);
+  stroke:rgba(255,255,255,.58);
+  stroke-width:2;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+#mordumGame5 .msg{min-height:30px;margin:10px 2px 0;color:#d9deea;font-weight:700}
+#mordumGame5 .buttons{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+#mordumGame5 button{border:1px solid #3d4758;background:#1a202b;color:#fff;border-radius:10px;padding:9px 13px;font-weight:900;cursor:pointer}
+#mordumGame5 button:hover{background:#242c39}
+#mordumGame5 .startPanel{position:absolute;inset:0;background:rgba(8,10,14,.88);display:flex;align-items:center;justify-content:center;padding:20px;z-index:10}
+#mordumGame5 .card{width:min(470px,92%);background:#151a23;border:1px solid #3b4556;border-radius:16px;padding:20px;text-align:center;box-shadow:0 20px 70px #000b}
+#mordumGame5 .myNumber{font-size:44px;font-weight:1000;color:#ffe477;margin:4px 0}
+#mordumGame5 .myColor{font-size:17px;font-weight:900}
+#mordumGame5 .playersList{margin:14px 0;padding:10px;background:#0c1016;border-radius:11px;text-align:left;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:13px}
+#mordumGame5 .help{margin-top:8px;font-size:12px;color:#9ca6b7;line-height:1.55}
+#mordumGame5 .danger{color:#ff8585}
+#mordumGame5 .blue{color:#74b8ff}
+#mordumGame5 .red{color:#ff707d}
+#mordumGame5 .resultLog{margin-top:12px;padding:12px 14px;background:#0c1016;border:1px solid #303949;border-radius:11px;display:none}
+#mordumGame5 .resultTitle{font-weight:1000;margin-bottom:8px}
+#mordumGame5 .resultGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#mordumGame5 .resultItem{padding:7px 8px;border-radius:8px;background:#171c25;text-align:center;font-weight:900;font-size:13px}
+#mordumGame5 .resultItem.survive{color:#7dff9a}
+#mordumGame5 .resultItem.dead{color:#ff7777}
+</style>
+</head>
+<body>
+<div id="mordumGame5">
+  <div class="top">
+    <h2>모르둠 두뇌사망 미니게임</h2>
+    <div class="hud">
+      <div class="badge">변환까지 <span id="phase">대기</span></div>
+      <div class="badge timer" id="timer">15.0</div>
+      <div class="badge" id="status">대기중</div>
+    </div>
+  </div>
+
+  <div class="arenaWrap">
+    <canvas id="arenaCanvas" width="900" height="540" aria-label="Mordum quarter-view arena"></canvas>
+    <div class="startPanel" id="startPanel">
+      <div class="card">
+        <div>이번 판에서 당신이 사용할 번호를 선택</div>
+        <select id="slotSelect">
+          <option value="0">1-1</option><option value="1">1-2</option><option value="2">1-3</option><option value="3">1-4</option>
+          <option value="4">2-1</option><option value="5">2-2</option><option value="6">2-3</option><option value="7">2-4</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:8px;margin:10px 0 6px;justify-content:center;cursor:pointer;">
+          <input type="checkbox" id="npcStealMySlot" style="width:18px;height:18px;">
+          <span>이번 판은 전환장판을 무조건 나에게 걸기</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;justify-content:center;cursor:pointer;">
+          <input type="checkbox" id="allowNpcStealMe" style="width:18px;height:18px;">
+          <span>NPC가 생존을 위해 내 자리를 최우선으로 뺏기 (YOU는 전환 대상 제외)</span>
+        </label>
+        <div class="myNumber" id="myNumber">1-1</div>
+        <div class="myColor" id="myColor">-</div>
+        <div class="playersList" id="playersList"></div>
+        <div class="help">마우스 클릭 또는 WASD/방향키로 YOU 이동<br>15초에 자기 번호 장판과 색이 모두 맞아야 생존합니다.</div>
+        <div class="buttons"><button id="startBtn">게임 시작</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="resultLog" id="resultLog">
+    <div class="resultTitle">최종 판정</div>
+    <div class="resultGrid" id="resultGrid"></div>
+  </div>
+  <div class="msg" id="msg">좌클릭/우클릭 이동 · WASD/방향키 이동</div>
+  <div class="buttons"><button id="restartBtn">새 판</button></div>
+</div>
+
+<script>
+(()=>{
+const root=document.getElementById('mordumGame5');
+const canvas=document.getElementById('arenaCanvas'), ctx=canvas.getContext('2d');
+const svg=null, zg=null, pg=null, pingg=null;
+const timerEl=document.getElementById('timer'), phaseEl=document.getElementById('phase');
+const statusEl=document.getElementById('status'), msgEl=document.getElementById('msg');
+const startPanel=document.getElementById('startPanel'), startBtn=document.getElementById('startBtn');
+const restartBtn=document.getElementById('restartBtn'), myNumber=document.getElementById('myNumber');
+const myColor=document.getElementById('myColor'), playersList=document.getElementById('playersList');
+
+const names=['1-1','1-2','1-3','1-4','2-1','2-2','2-3','2-4'];
+const pos={
+ // 참고 이미지의 배열을 그대로 따르되, 반원 경계에서 충분히 안쪽으로 배치.
+ // 1열: 1-1 / 1-2 / 1-3 / 1-4
+ // 2열: 2-1 / 2-2 / 2-3 / 2-4
+ // 좌우/중앙 완전 대칭.
+ '1-1':{x:245,y:92},'1-2':{x:345,y:125},'1-3':{x:455,y:125},'1-4':{x:555,y:92},
+ '2-1':{x:215,y:202},'2-2':{x:320,y:245},'2-3':{x:480,y:245},'2-4':{x:585,y:202}
+};
+const keys={}; let zones=[],ps=[],running=false,elapsed=0,last=0,target=null,plan=null,conversionDone=false,mouseGoal=null;
+const npcStealMySlot=document.getElementById('npcStealMySlot');
+const allowNpcStealMe=document.getElementById('allowNpcStealMe');
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function weightedColorCount(){
+  // 6:2 또는 7:1만 생성. 6:2가 조금 더 흔함.
+  return Math.random()<0.68 ? 6 : 7;
+}
+function makeColors(n){
+  const a=Array(8).fill('blue');
+  const redIdx=shuffle([...Array(8).keys()]).slice(0,n);
+  redIdx.forEach(i=>a[i]='red');
+  return a;
+}
+function cName(c){return c==='red'?'빨강':'파랑'}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+function moveToward(p,t,spd,dt){
+  const dx=t.x-p.x,dy=t.y-p.y,d=Math.hypot(dx,dy);
+  // 목적지 근처에서는 좌표를 정확히 고정해 미세한 떨림을 없앤다.
+  if(d<=7){ p.x=t.x; p.y=t.y; p.aiLocked=true; return; }
+  p.aiLocked=false;
+  const step=Math.min(d,spd*dt);
+  p.x+=dx/d*step; p.y+=dy/d*step;
+}
+
+function separatePlayers(){
+  // 기본 충돌 방지. 전환 장판 구간에서는 "안전한 NPC가 대상자에게 밀려 들어가는" 일이 없도록
+  // target-NPC 사이의 충돌 보정은 생략한다. NPC의 회피 판단을 우선한다.
+  const minDist=28;
+  for(let pass=0;pass<3;pass++) for(let i=0;i<ps.length;i++) for(let j=i+1;j<ps.length;j++){
+    const a=ps[i],b=ps[j]; if(!a.alive||!b.alive) continue;
+    if(!conversionDone && elapsed>=5 && elapsed<9 && (a===target || b===target)) continue;
+    const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
+    if(d>=minDist) continue;
+    const nx=d>0.001?dx/d:1, ny=d>0.001?dy/d:0;
+    const push=(minDist-(d||0))*0.52;
+    if(a.me){ b.x+=nx*push*2; b.y+=ny*push*2; }
+    else if(b.me){ a.x-=nx*push*2; a.y-=ny*push*2; }
+    else { a.x-=nx*push; a.y-=ny*push; b.x+=nx*push; b.y+=ny*push; }
+  }
+  ps.forEach(p=>{ if(!p.me) { p.x=clamp(p.x,24,776); p.y=clamp(p.y,28,382); } });
+}
+
+function insideArena(p){
+  // lower semicircle: center 400,0 radius 390
+  const dx=p.x-400,dy=p.y;
+  if(dy<3) return false;
+  const d=Math.hypot(dx,dy);
+  return d<=387 && p.x>=10 && p.x<=790;
+}
+function zoneColorAt(slot){return zones[slot].color}
+
+function build(){
+  zones=[]; ps=[]; target=null; plan=null; conversionDone=false; elapsed=0; mouseGoal=null;
+  const zc=makeColors(weightedColorCount());
+  names.forEach((n,i)=>zones.push({name:n,color:zc[i],...pos[n]}));
+  const chosenSlot=Number(slotSelect?.value ?? 0);
+  const restSlots=shuffle([...Array(8).keys()].filter(x=>x!==chosenSlot));
+  const slots=[chosenSlot,...restSlots];
+
+  // 시작 색은 1~3명만 자기 장판과 일치하도록 구성
+  const startMatchCount=1+Math.floor(Math.random()*3);
+  const pc=Array(8).fill(null);
+  const shuffledIds=shuffle([...Array(8).keys()]);
+  for(let k=0;k<startMatchCount;k++){
+    const i=shuffledIds[k], slot=slots[i];
+    pc[i]=zones[slot].color;
+  }
+  const badColors=[];
+  for(let i=0;i<8;i++) if(pc[i]===null) badColors.push(zones[slots[i]].color==='red'?'blue':'red');
+  shuffle(badColors);
+  let bi=0; for(let i=0;i<8;i++) if(pc[i]===null) pc[i]=badColors[bi++];
+
+  // 각 캐릭터는 시작부터 자신의 '번호 장판'에서 시작한다.
+  // 색상이 맞든 틀리든 상관없이 번호가 우선이며, 첫 5초 동안 NPC는 이동하지 않는다.
+  for(let i=0;i<8;i++){
+    const slot=slots[i], z=zones[slot];
+    ps.push({id:i,name:i===0?'YOU':'P'+(i+1),me:i===0,slot,color:pc[i],
+      x:z.x,y:z.y,alive:true,helper:false,baseSlot:slot,aiLocked:true});
+  }
+  renderZones();render();
+  myNumber.textContent=names[ps[0].slot];
+  myColor.innerHTML=`현재 색상: <span class="${ps[0].color}">${cName(ps[0].color)}</span>`;
+  playersList.innerHTML=ps.map(p=>`<div><b>${p.name}</b> · ${names[p.slot]}</div>`).join('');
+  msgEl.textContent='게임 시작 후 각자 자기 번호 장판으로 이동합니다.';
+  timerEl.textContent='15.0';phaseEl.textContent='대기';statusEl.textContent='시작 전';
+  startPanel.style.display='flex';
+  if(resultLog){ resultLog.style.display='none'; resultGrid.innerHTML=''; }
+}
+
+function resizeCanvas(){
+  const rect=canvas.getBoundingClientRect();
+  const w=Math.max(600,Math.floor(rect.width||900));
+  const h=Math.max(360,Math.floor(w*0.60));
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const bw=Math.floor(w*dpr), bh=Math.floor(h*dpr);
+  if(canvas.width!==bw || canvas.height!==bh){ canvas.width=bw; canvas.height=bh; }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  canvas._w=w; canvas._h=h;
+}
+// World: x=-4..4, y=0(back)..4(front). This is a perspective projection,
+// so the semicircle remains a real semicircular arena but reads as a 3D isometric/quarter view.
+function projectWorld(wx,wy){
+  const w=canvas._w||900, h=canvas._h||540;
+  const depth=1+wy*0.060;
+  // 카메라를 더 높은 위치에 둔 느낌: 앞뒤 크기 차이를 줄이고 바닥이 더 넓게 보인다.
+  return {x:w/2 + wx*82*depth, y:52 + wy*78, s:depth};
+}
+function worldFromGame(x,y){
+  return {x:(x-400)/100, y:y/80};
+}
+function ellipse(cx,cy,rx,ry,fill,stroke,lw){
+  ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+  if(fill){ctx.fillStyle=fill;ctx.fill()} if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw||1;ctx.stroke()}
+}
+function roundedRect(x,y,w,h,r,fill){
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();
+}
+function drawArena3D(){
+  const w=canvas._w,h=canvas._h;
+  ctx.clearRect(0,0,w,h);
+  // atmospheric background
+  const bg=ctx.createLinearGradient(0,0,0,h); bg.addColorStop(0,'#0a0d14');bg.addColorStop(1,'#030407');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+  // semicircle floor: diameter is the back edge, curved edge faces camera
+  const pts=[];
+  for(let i=0;i<=80;i++){
+    const a=Math.PI-i*Math.PI/80; // left -> right along upper semicircle in world
+    const wx=4*Math.cos(a), wy=4*Math.sin(a);
+    pts.push(projectWorld(wx,wy));
+  }
+  const left=projectWorld(-4,0), right=projectWorld(4,0);
+  ctx.beginPath();ctx.moveTo(left.x,left.y);pts.forEach(p=>ctx.lineTo(p.x,p.y));ctx.lineTo(right.x,right.y);ctx.closePath();
+  const g=ctx.createLinearGradient(0,50,0,h);g.addColorStop(0,'#1b202a');g.addColorStop(.55,'#171c25');g.addColorStop(1,'#0e1219');
+  ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#667080';ctx.lineWidth=3;ctx.stroke();
+  // floor grid follows the perspective
+  ctx.save();ctx.globalAlpha=.16;ctx.strokeStyle='#aab3c3';ctx.lineWidth=1;
+  for(let yy=.45;yy<=3.8;yy+=.45){
+    ctx.beginPath();
+    for(let i=0;i<=80;i++){const a=Math.PI-i*Math.PI/80;const wx=4*Math.cos(a);const wy=4*Math.sin(a); if(wy<yy)continue;
+      const xlimit=Math.sqrt(Math.max(0,16-yy*yy));}
+    const span=Math.sqrt(Math.max(0,16-yy*yy));let p1=projectWorld(-span,yy),p2=projectWorld(span,yy);
+    ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+  }
+  for(let xx=-3.5;xx<=3.5;xx+=.7){
+    ctx.beginPath();let started=false;
+    for(let yy=0;yy<=4;yy+=.08){if(xx*xx+yy*yy>16)break;let p=projectWorld(xx,yy);if(!started){ctx.moveTo(p.x,p.y);started=true}else ctx.lineTo(p.x,p.y)}
+    ctx.stroke();
+  }ctx.restore();
+  // center divider
+  const c0=projectWorld(0,0),c1=projectWorld(0,4);
+  ctx.strokeStyle='rgba(220,225,235,.38)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(c0.x,c0.y);ctx.lineTo(c1.x,c1.y);ctx.stroke();
+  // boss platform at rear
+  const bp=projectWorld(0,.25); ellipse(bp.x,bp.y+10,86,27,'rgba(0,0,0,.45)');
+  ellipse(bp.x,bp.y,72,28,'#141922','#9aa4b8',3);
+  ellipse(bp.x,bp.y-8,56,22,'#242b36','#566173',2);
+  ctx.fillStyle='#fff';ctx.font='900 17px system-ui';ctx.textAlign='center';ctx.fillText('MORDUM',bp.x,bp.y-2);
+}
+function drawZones3D(){
+  zones.forEach(z=>{
+    const q=worldFromGame(z.x,z.y),p=projectWorld(q.x,q.y),rx=36*p.s,ry=23*p.s;
+    ellipse(p.x,p.y+6,rx+4,ry+3,'rgba(0,0,0,.38)');
+    const grad=ctx.createRadialGradient(p.x,p.y,2,p.x,p.y,rx);
+    if(z.color==='red'){grad.addColorStop(0,'#ef6470');grad.addColorStop(.55,'#a92f3d');grad.addColorStop(1,'#5e1824')}
+    else{grad.addColorStop(0,'#72b8ff');grad.addColorStop(.55,'#3478ba');grad.addColorStop(1,'#17466e')}
+    ellipse(p.x,p.y,rx,ry,grad,'#080b10',2.5);
+    ctx.fillStyle='#fff';ctx.font=`900 ${Math.max(11,15*p.s)}px system-ui`;ctx.textAlign='center';
+    ctx.fillText(z.name,p.x,p.y+5);
+  });
+}
+function drawSeatMarker3D(){
+  if(elapsed<5 || elapsed>=9)return;
+  let slot=null;
+  if(target && !target.me && target.huntMySlot) slot=ps[0]?.slot;
+  else if(plan && plan.victimSlot!=null) slot=plan.victimSlot;
+  if(slot==null)return;
+  const z=zones[slot];if(!z)return;
+  const q=worldFromGame(z.x,z.y),p=projectWorld(q.x,q.y);
+  ctx.save();ctx.globalAlpha=.98;
+  ellipse(p.x,p.y-12,7,4,'#43ff73','#07150b',1.5);
+  ctx.restore();
+}
+function drawPlayers3D(){
+  const ordered=[...ps].filter(p=>p.alive).sort((a,b)=>a.y-b.y);
+  ordered.forEach(p=>{
+    const q=worldFromGame(p.x,p.y),pr=projectWorld(q.x,q.y);
+    const scale=pr.s*(p.me?1.0:.68), r=18*scale;
+    // 단순한 원형 캐릭터: 캐릭터 형태로 만들지 않고 색깔 원으로만 표시.
+    ellipse(pr.x,pr.y+10*scale,r*1.18,r*.38,'rgba(0,0,0,.48)');
+    const grad=ctx.createRadialGradient(pr.x-r*.28,pr.y-r*.32,1,pr.x,pr.y,r);
+    if(p.color==='red'){
+      grad.addColorStop(0,'#ff8a93'); grad.addColorStop(.62,'#d94a58'); grad.addColorStop(1,'#7a1e2a');
+    }else{
+      grad.addColorStop(0,'#a8d9ff'); grad.addColorStop(.62,'#4e9be8'); grad.addColorStop(1,'#24517e');
+    }
+    ctx.fillStyle=grad;ctx.beginPath();ctx.arc(pr.x,pr.y,r,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#090b10';ctx.lineWidth=Math.max(2,2.5*scale);ctx.stroke();
+    if(p.me){
+      ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=Math.max(2,2.5*scale);
+      ctx.beginPath();ctx.arc(pr.x,pr.y,r+3*scale,0,Math.PI*2);ctx.stroke();
+    }
+    if(p.isTarget){
+      ctx.save();ctx.strokeStyle='rgba(255,255,255,.82)';ctx.lineWidth=2;ctx.setLineDash([5,4]);
+      ctx.beginPath();ctx.ellipse(pr.x,pr.y+3,r*1.18,r*.62,0,0,Math.PI*2);ctx.stroke();ctx.restore();
+    }
+    ctx.textAlign='center';ctx.font=`1000 ${p.me?18:11}px system-ui`;
+    ctx.lineWidth=5;ctx.strokeStyle='#08090c';ctx.strokeText(p.me?'YOU':p.name,pr.x,pr.y-r-11);ctx.fillStyle='#fff';ctx.fillText(p.me?'YOU':p.name,pr.x,pr.y-r-11);
+    ctx.font=`900 ${Math.max(10,12*scale)}px system-ui`;ctx.lineWidth=4;ctx.strokeStyle='#08090c';ctx.strokeText(names[p.slot],pr.x,pr.y+r+17);ctx.fillStyle='#ffe477';ctx.fillText(names[p.slot],pr.x,pr.y+r+17);
+  });
+}
+function drawTargetAura3D(){
+  if(!target || elapsed<5 || elapsed>=9)return;
+  const q=worldFromGame(target.x,target.y),p=projectWorld(q.x,q.y);
+  ellipse(p.x,p.y,104*p.s,63*p.s,'rgba(255,255,255,.15)','rgba(255,255,255,.62)',2.5);
+}
+function drawPing3D(){ /* marker included in drawSeatMarker3D */ }
+
+function renderZones(){ /* canvas renderer draws zones every frame */ }
+function render(){
+  resizeCanvas();
+  drawArena3D();
+  drawZones3D();
+  drawSeatMarker3D();
+  drawPlayers3D();
+  drawTargetAura3D();
+  drawPing3D();
+}
+function renderTargetAura(){ /* canvas renderer */ }
+
+function renderPings(){ /* canvas renderer */ }
+
+function choosePlan(){
+  if(!target)return;
+  const future=target.color==='red'?'blue':'red';
+  target.originalSlot=target.slot;
+  // 목적지는 미리 지정하지 않는다. 전환 대상이 실제로 들어간 지역을 9초 순간에 지역 객체가 판정한다.
+  target.desiredSlot=null;
+  target.huntMySlot=false;
+  plan=null;
+  const ownZone=zoneColorAt(target.originalSlot);
+  // NPC가 전환 대상이면, 조건이 맞을 때 YOU의 자리를 최우선으로 노린다.
+  // 미래 색이 YOU 장판 색과 맞아야 실제로 생존 가능한 침탈이다.
+  const mySlot=ps[0]?.slot ?? 0;
+  if(!target.me && zoneColorAt(mySlot)===future && mySlot!==target.originalSlot){
+    target.huntMySlot=true;
+    target.desiredSlot=mySlot;
+    msgEl.textContent=`${target.name} 변환 대상 · 조건 충족! YOU의 ${names[mySlot]} 자리를 우선 노립니다.`;
+    return;
+  }
+  if(ownZone===future){
+    msgEl.textContent=`${target.name} 변환 대상 · 자기 자리 유지 가능`;
+  }else{
+    msgEl.textContent=`${target.name} 변환 대상 · 실제로 침범한 지역의 주인이 판단`;
+  }
+}
+
+function pickTarget(){
+  // 기본: YOU 포함 전원 중 완전 랜덤으로 전환 대상을 뽑는다.
+  // NPC 자리 침탈 옵션 ON: YOU는 전환 대상에서 제외하고 NPC 중에서만 랜덤 선택한다.
+  let candidates=ps.filter(p=>p.alive);
+  if(npcStealMySlot?.checked){
+    const npcs=candidates.filter(p=>!p.me);
+    target=npcs[Math.floor(Math.random()*npcs.length)];
+  }else{
+    target=candidates[Math.floor(Math.random()*candidates.length)];
+  }
+  target.isTarget=true;
+  choosePlan();
+  renderTargetAura();
+  renderPings();
+}
+
+function nearestZoneToPlayer(p){
+  let best=null,bestD=Infinity;
+  zones.forEach((z,i)=>{
+    const d=dist(p,z);
+    if(d<bestD){bestD=d;best={slot:i,zone:z,d};}
+  });
+  return best;
+}
+
+function convert(){
+  if(conversionDone)return;
+  const aura=110;
+
+  // 9초 순간 장판 안에 실제로 들어온 객체만 변환한다.
+  ps.forEach(p=>{
+    if(p.alive && dist(p,target)<=aura){
+      p.color=p.color==='red'?'blue':'red';
+    }
+  });
+
+  // 전환 대상이 실제로 어느 지역 객체를 점유했는지 그 순간 판정한다.
+  // 미리 victim/목적지를 지정하지 않는다.
+  const hit=nearestZoneToPlayer(target);
+  if(hit && hit.d<=58 && hit.slot!==target.originalSlot){
+    const owner=ps.find(p=>p!==target && p.alive && p.slot===hit.slot);
+    if(owner){
+      const oldTargetSlot=target.originalSlot;
+      target.slot=hit.slot;
+      owner.slot=oldTargetSlot;
+      owner.evicted=true;
+      owner.evictedSlot=oldTargetSlot;
+      // owner는 이제 '전환 대상의 원래 자리'라는 비어 있는 새 자리를 가진다.
+      // 이후 AI는 그 자리의 색을 기준으로 움직인다.
+      target.desiredSlot=hit.slot;
+      plan={targetSlot:hit.slot,evictedId:owner.id,escapeSlot:oldTargetSlot};
+    }
+  }else{
+    target.desiredSlot=target.slot;
+    plan=null;
+  }
+
+  conversionDone=true;
+  target.isTarget=false;
+  target.chasing=true;
+  render();
+}
+
+function keepNpcInArena(p){
+  p.x=clamp(p.x,24,776);
+  p.y=clamp(p.y,28,382);
+  const dx=p.x-400;
+  const maxY=Math.sqrt(Math.max(0,387*387-dx*dx));
+  p.y=Math.min(p.y,maxY);
+}
+
+function moveNpcAwayFromTarget(p,t,minDist,spd,dt){
+  const dx=p.x-t.x,dy=p.y-t.y;
+  const len=Math.hypot(dx,dy)||1;
+  // 목표 지점을 장판 반경보다 훨씬 바깥으로 잡는다.
+  const need=Math.max(minDist,205);
+  let goal={x:t.x+dx/len*need,y:t.y+dy/len*need};
+  // 경기장 밖으로 밀리면 반대 방향 성분을 섞어 가장 가까운 내부 지점으로 보정.
+  goal.x=clamp(goal.x,30,770);
+  goal.y=clamp(goal.y,35,375);
+  const ddx=goal.x-400;
+  const maxY=Math.sqrt(Math.max(0,380*380-ddx*ddx));
+  goal.y=Math.min(goal.y,maxY);
+  moveToward(p,goal,spd,dt);
+  keepNpcInArena(p);
+}
+
+function npcAI(dt){
+  ps.forEach(p=>{
+    if(!p.alive || p.me)return;
+
+    // 지역 객체 인식: 대상자가 내 현재 지역에 실제로 들어오면
+    // '내 자리를 뺏긴 것'으로 판단한다. 미리 지정된 victim 명령은 없다.
+    const own=zones[p.slot];
+    const targetInMyZone=target && target!==p && !conversionDone &&
+      dist(target,own)<=58 && p.slot!==target.originalSlot;
+
+    // 0~5초: 자기 지역에 대기
+    if(!conversionDone && elapsed<5){
+      moveToward(p,{x:own.x,y:own.y},170,dt);
+      return;
+    }
+
+    if(!conversionDone && elapsed>=5 && elapsed<9 && target){
+      // ===== 최우선: NPC 전환 대상이 YOU의 자리를 노리는 케이스 =====
+      // 조건이 맞는 경우 target NPC는 다른 판단보다 YOU 장판 점유를 우선한다.
+      // 단, 실제 자리를 빼앗기는 것은 9초 순간 지역 객체가 판정한다.
+      if(p===target && target.huntMySlot){
+        const myZone=zones[ps[0].slot];
+        moveToward(p,myZone,340,dt);
+        return;
+      }
+
+      // ===== 최우선: 내 지역을 전환 대상이 먹으러 왔다 =====
+      if(targetInMyZone){
+        // 내가 물려받을 지역은 '전환 대상의 원래 지역'.
+        // 그 지역 색과 현재 내 색이 다르면 장판을 밟아 색을 맞춘다.
+        const escapeSlot=target.originalSlot;
+        const escapeZone=zones[escapeSlot];
+        const needColor=escapeZone.color;
+
+        if(p.color!==needColor){
+          // 색을 맞춰야 하므로 대상자의 전환 장판 안으로 들어간다.
+          // 단, 중심에 박지 않고 가장자리에서 변환을 받는다.
+          const d=dist(p,target);
+          if(d>112){
+            moveToward(p,target,310,dt);
+          }else{
+            const ang=(p.id*2.399+1.1);
+            moveToward(p,{x:target.x+Math.cos(ang)*72,y:target.y+Math.sin(ang)*72*.62},260,dt);
+          }
+        }else{
+          // 이미 물려받을 지역의 색과 맞는다. 대상자에게서 멀어져 원래 지역으로 탈출.
+          moveToward(p,escapeZone,340,dt);
+        }
+        return;
+      }
+
+      // ===== 일반 NPC 판단 =====
+      // 현재 내 지역 색과 내가 가진 색이 맞으면 대상자를 피한다.
+      // 대상자가 접근해도 멍하니 서 있지 않는다.
+      const safeNow=(p.color===own.color);
+      const d=dist(p,target);
+      if(safeNow){
+        // 안전한 NPC는 전환 장판 가장자리에서 버티지 않고 훨씬 멀리 이탈한다.
+        // 장판 반경 110보다 넉넉하게 205 이상 확보한 뒤 9초까지 유지한다.
+        if(d<215){
+          moveNpcAwayFromTarget(p,target,215,390,dt);
+        }else{
+          // 대상자가 가까워지면 다시 회피하고, 충분히 멀면 자기 지역을 향한다.
+          moveToward(p,own,190,dt);
+        }
+        return;
+      }
+
+      // 내 지역 색과 현재 색이 다르면 전환 장판을 이용해 색을 맞춘다.
+      if(d>112){
+        moveToward(p,target,285,dt);
+      }else{
+        const ang=p.id*2.399+0.7;
+        moveToward(p,{x:target.x+Math.cos(ang)*70,y:target.y+Math.sin(ang)*70*.62},220,dt);
+      }
+      return;
+    }
+
+    // 9초 이후: 자리 교환은 convert()가 확정했다.
+    // 각 NPC는 '현재 slot + 현재 color'가 맞는 지역으로 즉시 복귀한다.
+    if(conversionDone){
+      // 자리를 뺏긴 NPC는 절대로 예전 자리를 고수하지 않는다.
+      // convert()에서 p.slot이 이미 '전환 대상의 원래 자리'로 바뀌었으므로
+      // 그 빈 지역 객체를 자기 최종 자리로 인정하고 바로 복귀한다.
+      const z=zones[p.slot];
+      moveToward(p,z,390,dt);
+      return;
+    }
+  });
+}
+
+function playerKeyboard(dt){
+  const dx=(keys['d']||keys['ArrowRight']?1:0)-(keys['a']||keys['ArrowLeft']?1:0);
+  const dy=(keys['s']||keys['ArrowDown']?1:0)-(keys['w']||keys['ArrowUp']?1:0);
+  if(dx||dy){
+    const l=Math.hypot(dx,dy);
+    ps[0].x+=dx/l*185*dt;ps[0].y+=dy/l*185*dt;
+    keepMe();
+  }
+}
+function keepMe(){
+  const p=ps[0];
+  p.x=clamp(p.x,28,772);p.y=clamp(p.y,30,382);
+  // 반원 바깥으로 나가지 않게
+  const dx=p.x-400, maxY=Math.sqrt(Math.max(0,387*387-dx*dx));
+  p.y=Math.min(p.y,maxY);
+}
+function pointerPos(e){
+  const r=canvas.getBoundingClientRect();
+  const sx=(e.clientX-r.left)/r.width*(canvas._w||900);
+  const sy=(e.clientY-r.top)/r.height*(canvas._h||540);
+  const wy=Math.max(0,Math.min(4,(sy-66)/86));
+  const wx=(sx-(canvas._w||900)/2)/(86*(1+wy*.105));
+  return {x:400+wx*100,y:wy*80};
+}
+function clickMove(e){
+  if(!running)return;
+  mouseGoal=pointerPos(e);
+}
+function updateMouse(dt){
+  if(!mouseGoal)return;
+  const p=ps[0],d=dist(p,mouseGoal);
+  if(d<5){mouseGoal=null;return}
+  const sp=205,step=Math.min(d,sp*dt);
+  p.x+=(mouseGoal.x-p.x)/d*step;p.y+=(mouseGoal.y-p.y)/d*step;keepMe();
+}
+
+canvas.addEventListener('click',clickMove);
+canvas.addEventListener('contextmenu',e=>{e.preventDefault();clickMove(e)});
+window.addEventListener('keydown',e=>{keys[e.key]=true});
+window.addEventListener('keyup',e=>{keys[e.key]=false});
+
+function finish(){
+  running=false;
+
+  // 15초가 끝나는 그 순간의 실제 위치/색상만으로 판정한다.
+  // NPC를 강제로 안전지대로 보내거나 색을 바꾸지 않는다.
+  const results=ps.map(p=>{
+    const z=zones[p.slot];
+    const inOwnZone=dist(p,z)<=48;
+    const colorMatch=p.color===z.color;
+    const survive=inOwnZone && colorMatch;
+    return {p,survive,inOwnZone,colorMatch};
+  });
+
+  // 각 번호는 한 명에게만 배정되어 있으므로, 같은 안전지대에 두 명이 생기는 경우도
+  // 자기 번호가 그 지대인 사람만 해당 지대의 정상 판정 대상이 된다.
+  results.forEach(r=>r.p.alive=true);
+
+  const ordered=results.slice().sort((a,b)=>a.p.slot-b.p.slot);
+  resultGrid.innerHTML=ordered.map(r=>
+    `<div class="resultItem ${r.survive?'survive':'dead'}">${names[r.p.slot]} ${r.survive?'생존':'사망'}</div>`
+  ).join('');
+  resultLog.style.display='block';
+
+  const me=results.find(r=>r.p.me);
+  statusEl.textContent=me.survive?'YOU 생존':'YOU 사망';
+  phaseEl.textContent='판정 완료';
+  msgEl.textContent=me.survive?'생존 성공!':'생존 실패!';
+  render();
+}
+
+function loop(t){
+  if(!running)return;
+  if(!last)last=t;
+  const dt=Math.min(.035,(t-last)/1000);last=t;
+  elapsed+=(t-(loop._start||t))/1000;
+  loop._start=t;
+
+  // elapsed 보정: 실제 게임 시간은 last 기준으로 별도 누적
+  loop._gameTime=(loop._gameTime||0)+dt;
+  elapsed=loop._gameTime;
+
+  const remain=Math.max(0,15-elapsed);
+  timerEl.textContent=remain.toFixed(1);
+  if(elapsed<5){phaseEl.textContent='변환 대상 대기'}
+  else if(elapsed<9){phaseEl.textContent='변환 장판 · 9초 변환'}
+  else if(elapsed<15){phaseEl.textContent='변환 완료 · 최종 위치 이동'}
+  else{phaseEl.textContent='판정'}
+
+  if(elapsed>=5 && !target)pickTarget();
+  if(elapsed>=9 && !conversionDone)convert();
+
+  playerKeyboard(dt);updateMouse(dt);npcAI(dt);if(elapsed>=5) separatePlayers();render();
+
+  if(elapsed>=15){finish();return}
+  requestAnimationFrame(loop);
+}
+
+function start(){
+  startPanel.style.display='none';
+  running=true;elapsed=0;last=0;loop._start=0;loop._gameTime=0;
+  statusEl.textContent='진행중';statusEl.className='badge';
+  msgEl.textContent='5초에 변환 장판 생성 · 9초에 색상 변환 · 15초 최종 판정';
+  requestAnimationFrame(loop);
+}
+slotSelect.addEventListener('change',()=>{
+  if(!running) build();
+});
+startBtn.onclick=start;
+restartBtn.onclick=()=>{running=false;build()};
+build();
+})();
+</script>
+</body>
+</html>
